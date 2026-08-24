@@ -1,33 +1,11 @@
-#define MINIAUDIO_IMPLEMENTATION
-#include "miniaudio.h"
-#include <cmath>
+#include "audio.h"
 #include <cstdlib>
 #include <string>
 #include <thread>
 
-struct Melody {
-    const int* tones;
-    int toneCount;
-    int sample = 0;
-    int toneSamples;
-    int pauseSamples;
-};
-
-void audioCallback(ma_device* device, void* outputData, const void*, ma_uint32 frameCount) {
-    auto* melody = static_cast<Melody*>(device->pUserData);
-    auto* output = static_cast<float*>(outputData);
-
-    for (ma_uint32 index = 0; index < frameCount; ++index, ++melody->sample) {
-        const int position = melody->sample % (melody->toneSamples + melody->pauseSamples);
-        const int toneIndex = melody->sample / (melody->toneSamples + melody->pauseSamples) % melody->toneCount;
-        output[index] = position < melody->toneSamples
-            ? 0.3f * std::sin(2 * M_PI * melody->tones[toneIndex] * position / 44100.0)
-            : 0.0f;
-    }
-}
-
 int main() {
-    const char* paragraph = "Happy birthday to you.Happy birthday to you.Happy birthday to you.Happy ";
+    const char* paragraph = R"(13-ish years ago I showed you some web language code. You wondered why the code was made to do what it does but that didn’t stop you from learning it. That day you put the new knowledge to good use making a web-app that wished me a happy birthday with animation. That code was then printed on paper and stuck to my birthday cake. I loved it!
+People have talents. Some get paid for their talents. Few put their talents to use for others - it is very special when they do. I think you are an uber special guy who uses your talents for awesome and not evil. I hope you can feel that during this season of your life.)";
     const int tones[] = {262, 262, 294, 262, 349, 330};
     const int sampleRate = 44100;
     const int toneSamples = sampleRate / 3;

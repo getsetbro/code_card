@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seth Audio Project</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css">
+  <style>
+    :root {
+      color: #202124;
+      background: #f2f0eb;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    body {
+      margin: 0;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 32px;
+    }
+
+    header {
+      border-bottom: 3px solid #202124;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin: 0 0 8px;
+    }
+
+    p {
+      color: #5f6368;
+      margin: 0;
+    }
+
+    section {
+      background: #fff;
+      border: 1px solid #d9d5cd;
+      margin: 0 0 28px;
+      page-break-inside: avoid;
+    }
+
+    h2 {
+      background: #e7e2d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      letter-spacing: 0;
+      margin: 0;
+      padding: 10px 14px;
+    }
+
+    pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      margin: 0;
+      overflow-wrap: anywhere;
+      padding: 16px;
+      white-space: pre-wrap;
+    }
+
+    pre code.hljs {
+      background: transparent;
+      padding: 0;
+    }
+
+    @media print {
+      @page {
+        margin: 16mm;
+      }
+
+      :root {
+        background: #fff;
+      }
+
+      main {
+        max-width: none;
+        padding: 0;
+      }
+
+      header {
+        margin-bottom: 18px;
+      }
+
+      section {
+        border: 1px solid #999;
+        margin-bottom: 0;
+        page-break-inside: auto;
+      }
+
+      section + section {
+        break-before: page;
+      }
+
+      h2 {
+        background: #eee;
+      }
+
+      pre {
+        font-size: 9px;
+        line-height: 1.35;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Seth Audio Project</h1>
+      <p>Printable source code</p>
+    </header>
+
+    <section>
+      <h2>main.cpp</h2>
+      <pre><code>#include "audio.h"
+#include &lt;cstdlib&gt;
+#include &lt;string&gt;
+#include &lt;thread&gt;
+
+int main() {
+  const char* paragraph = R"(13-ish years ago I showed you some web language code. You wondered why the code was made to do what it does but that didn’t stop you from learning it. That day you put the new knowledge to good use making a web-app that wished me a happy birthday with animation. That code was then printed on paper and stuck to my birthday cake. I loved it!
+People have talents. Some get paid for their talents. Few put their talents to use for others - it is very special when they do. I think you are an uber special guy who uses your talents for awesome and not evil. I hope you can feel that during this season of your life.)";
+    const int tones[] = {262, 262, 294, 262, 349, 330};
+    const int sampleRate = 44100;
+    const int toneSamples = sampleRate / 3;
+    const int pauseSamples = sampleRate / 20;
+    Melody melody{tones, 6, 0, toneSamples, pauseSamples};
+
+    std::string command = "/usr/bin/say -v Alex \"" + std::string(paragraph) + "\"";
+
+    ma_device_config config = ma_device_config_init(ma_device_type_playback);
+    config.playback.format = ma_format_f32;
+    config.playback.channels = 1;
+    config.sampleRate = sampleRate;
+    config.dataCallback = audioCallback;
+    config.pUserData = &amp;melody;
+
+    ma_device device;
+    if (ma_device_init(nullptr, &amp;config, &amp;device) != MA_SUCCESS) return 1;
+    if (ma_device_start(&amp;device) != MA_SUCCESS) {
+        ma_device_uninit(&amp;device);
+        return 1;
+    }
+    std::thread voice([&amp;command]() {
+        system(command.c_str());
+    });
+    voice.join();
+    ma_device_uninit(&amp;device);
+}</code></pre>
+    </section>
+
+    <section>
+      <h2>audio.h</h2>
+      <pre><code>#pragma once
+
+#include "miniaudio.h"
+
+struct Melody {
+    const int* tones;
+    int toneCount;
+    int sample = 0;
+    int toneSamples;
+    int pauseSamples;
+};
+
+void audioCallback(ma_device* device, void* outputData, const void*, ma_uint32 frameCount);</code></pre>
+    </section>
+
+    <section>
+      <h2>audio.cpp</h2>
+      <pre><code>#include "audio.h"
+
+#include &lt;cmath&gt;
+
+void audioCallback(ma_device* device, void* outputData, const void*, ma_uint32 frameCount) {
+    auto* melody = static_cast&lt;Melody*&gt;(device-&gt;pUserData);
+    auto* output = static_cast&lt;float*&gt;(outputData);
+
+    for (ma_uint32 index = 0; index &lt; frameCount; ++index, ++melody-&gt;sample) {
+        const int position = melody-&gt;sample % (melody-&gt;toneSamples + melody-&gt;pauseSamples);
+        const int toneIndex = melody-&gt;sample / (melody-&gt;toneSamples + melody-&gt;pauseSamples) % melody-&gt;toneCount;
+        output[index] = position &lt; melody-&gt;toneSamples
+            ? 0.3f * std::sin(2 * M_PI * melody-&gt;tones[toneIndex] * position / 44100.0)
+            : 0.0f;
+    }
+}</code></pre>
+    </section>
+
+    <section>
+      <h2>miniaudio.cpp</h2>
+      <pre><code>#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"</code></pre>
+    </section>
+  </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script>
+    document.querySelectorAll("pre code").forEach((block) => {
+      block.classList.add("language-cpp");
+      window.hljs.highlightElement(block);
+    });
+  </script>
+</body>
+</html>
